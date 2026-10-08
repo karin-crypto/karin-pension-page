@@ -1,0 +1,42 @@
+name: Build and publish page
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Render preview image and touch icon
+        run: |
+          npx -y playwright@1.47.2 screenshot --channel=chrome --viewport-size="1200, 630" --wait-for-timeout=3000 "file://$PWD/og.html" og.png
+          npx -y playwright@1.47.2 screenshot --channel=chrome --viewport-size="180, 180" --wait-for-timeout=500 "file://$PWD/icon.html" apple-touch-icon.png
+          ls -la og.png apple-touch-icon.png
+
+      - name: Publish to gh-pages branch
+        run: |
+          mkdir -p out
+          cp index.html favicon.svg og.png apple-touch-icon.png out/
+          touch out/.nojekyll
+          cd out
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Publish ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
